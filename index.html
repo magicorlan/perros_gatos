@@ -81,8 +81,8 @@
 
       (async () => {
           console.log("Cargando modelo...");
-          modelo = await tf.loadLayersModel("https://ringa-tech.com/exportacion/perros-gatos/model.json");
-          //modelo = await tf.loadLayersModel("model.json");
+          //modelo = await tf.loadLayersModel("https://ringa-tech.com/exportacion/perros-gatos/model.json");
+          modelo = await tf.loadLayersModel("model.json");
           console.log("Modelo cargado...");
       })();
 
