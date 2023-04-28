@@ -11,9 +11,14 @@
 
     <style>
       #resultado {
-        font-weight: bold;
-        font-size: 6rem;
+        font-weight:  bold;
+        font-size:  6rem;
         text-align: center;
+      }
+
+      .canvas-container {
+          margin: 0 auto;
+          border: 1px solid #ccc;
       }
     </style>
   </head>
@@ -25,7 +30,7 @@
         <h1 class="display-5 fw-bold">Perros y gatos</h1>
         <div class="col-lg-6 mx-auto">
           <p class="lead mb-0">Clasificaci&oacute;n de im&aacute;genes (Perro o Gato) usando la c&aacute;mara web utilizando Tensorflow.js</p>
-          <p class="lead mb-4">Revisa <a href="https://youtube.com/RingaTech">mi canal</a> para este y otros proyectos</p>
+          <p class="lead mb-4">El detalle puedes verlo en <a href="https://youtu.be/LRckH4U5ls8">este video</a></p>
         </div>
       </div>
 
@@ -37,7 +42,7 @@
             <video id="video" playsinline autoplay style="width: 1px;"></video>
             <button class="btn btn-primary mb-2" id="cambiar-camara" onclick="cambiarCamara();">Cambiar camara</button>
             <canvas id="canvas" width="400" height="400" style="max-width: 100%;"></canvas>
-            <canvas id="otrocanvas" width="150" height="150" style="display: none"></canvas>
+            <canvas id="othercanvas" width="150" height="150" style="display: none"></canvas>
             <div id="resultado"></div>            
           </div>
         </div>
@@ -61,55 +66,58 @@
 
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@2.0.0/dist/tf.min.js"></script>
 
-  <script type="text/javascript">
+    <script type="text/javascript">
 
-    var tamano = 400;
-    var video = document.getElementById("video");
-    var canvas = document.getElementById("canvas");
-    var otrocanvas = document.getElementById("otrocanvas");
-    var ctx = canvas.getContext("2d");
-    var currentStream = null;
-    var facingMode = "user";
+      //Tomar y configurar el canvas
+      var canvas = document.getElementById("canvas");
+      var video = document.getElementById("video");
+      var ctx = canvas.getContext("2d");
+      var modelo = null;
+      var size = 400;
+      var camaras = [];
 
-    var modelo = null;
+      var currentStream = null;
+      var facingMode = "user";
 
-    (async() => {
-      console.log("Cargando modelo...");
-      modelo = await tf.loadLayersModel("model.json");
-      console.log("Modelo cargado");
-    })();
+      (async () => {
+          console.log("Cargando modelo...");
+          modelo = await tf.loadLayersModel("https://ringa-tech.com/exportacion/perros-gatos/model.json");
+          //modelo = await tf.loadLayersModel("model.json");
+          console.log("Modelo cargado...");
+      })();
 
-    window.onload = function() {
-      mostrarCamara();
-    }
-
-    function mostrarCamara() {
-      var opciones = {
-        audio: false,
-        video: {
-          width: tamano, height: tamano
-        }
+      window.onload = function() {
+          mostrarCamara();
       }
 
-      if (navigator.mediaDevices.getUserMedia) {
-        navigator.mediaDevices.getUserMedia(opciones)
-            .then(function(stream) {
-              currentStream = stream;
-              video.srcObject = currentStream;
-              procesarCamara();
-              predecir();
-            })
-            .catch(function(err) {
-              alert("No se pudo utilizar la camara :(");
-              console.log(err);
-              alert(err);
-            })
-      } else {
-        alert("No existe la funcion getUserMedia");
-      }
-    }
+      function mostrarCamara() {
 
-    function cambiarCamara() {
+          var opciones = {
+              audio: false,
+              video: {
+                  facingMode: "user", width: size, height: size
+              }
+          };
+
+          if(navigator.mediaDevices.getUserMedia) {
+              navigator.mediaDevices.getUserMedia(opciones)
+                  .then(function(stream) {
+                      currentStream = stream;
+                      video.srcObject = currentStream;
+                      procesarCamara();
+                      predecir();
+                  })
+                  .catch(function(err) {
+                      alert("No se pudo utilizar la camara :(");
+                      console.log("No se pudo utilizar la camara :(", err);
+                      alert(err);
+                  })
+          } else {
+              alert("No existe la funcion getUserMedia... oops :( no se puede usar la camara");
+          }
+      }
+
+      function cambiarCamara() {
           if (currentStream) {
               currentStream.getTracks().forEach(track => {
                   track.stop();
@@ -121,7 +129,7 @@
           var opciones = {
               audio: false,
               video: {
-                  facingMode: facingMode, width: tamano, height: tamano
+                  facingMode: facingMode, width: size, height: size
               }
           };
 
@@ -136,55 +144,52 @@
               })
       }
 
-    function procesarCamara() {
-      ctx.drawImage(video, 0, 0, tamano, tamano, 0, 0, tamano, tamano);
-      setTimeout(procesarCamara, 20);
-    }
+      function predecir() {
+          if (modelo != null) {
+              //Pasar canvas a version 150x150
+              resample_single(canvas, 150, 150, othercanvas);
 
-    function predecir() {
-      if (modelo != null) {
-        resample_single(canvas, 100, 100, otrocanvas);
+              var ctx2 = othercanvas.getContext("2d");
 
-        //Hacer la predicción
-        var ctx2 = otrocanvas.getContext("2d");
-        var imgData = ctx2.getImageData(0,0, 100, 100);
+              var imgData = ctx2.getImageData(0,0,150,150);
+              var arr = []; //El arreglo completo
+              var arr150 = []; //Al llegar a arr150 posiciones se pone en 'arr' como un nuevo indice
+              for (var p=0, i=0; p < imgData.data.length; p+=4) {
+                  var red = imgData.data[p]/255;
+                  var green = imgData.data[p+1]/255;
+                  var blue = imgData.data[p+2]/255;
+                  //Invertir pq si no tio tensorflow se enoja >:(
+                  arr150.push([red, green, blue]); //Agregar al arr150 y normalizar a 0-1. Aparte queda dentro de un arreglo en el indice 0... again
+                  if (arr150.length == 150) {
+                      arr.push(arr150);
+                      arr150 = [];
+                  }
+              }
 
-        var arr = [];
-        var arr100 = [];
+              arr = [arr]; //Meter el arreglo en otro arreglo por que si no tio tensorflow se enoja >:(
+              //Nah basicamente Debe estar en un arreglo nuevo en el indice 0, por ser un tensor4d en forma 1, 150, 150, 1
+              var tensor4 = tf.tensor4d(arr);
+              var resultados = modelo.predict(tensor4).dataSync();
+              var mayorIndice = resultados.indexOf(Math.max.apply(null, resultados));
 
-        for (var p=0; p < imgData.data.length; p+= 4) {
-          var rojo = imgData.data[p] / 255;
-          var verde = imgData.data[p+1] / 255;
-          var azul = imgData.data[p+2] / 255;
-
-          var gris = (rojo+verde+azul)/3;
-
-          arr100.push([gris]);
-          if (arr100.length == 100) {
-            arr.push(arr100);
-            arr100 = [];
+              var clases = ['Gato', 'Perro'];
+              console.log("Prediccion", clases[mayorIndice]);
+              document.getElementById("resultado").innerHTML = clases[mayorIndice];
           }
-        }
 
-        arr = [arr];
-
-        var tensor = tf.tensor4d(arr);
-        var resultado = modelo.predict(tensor).dataSync();
-
-        var respuesta;
-        if (resultado <= .5) {
-          respuesta = "Gato";
-        } else {
-          respuesta = "Perro";
-        }
-        document.getElementById("resultado").innerHTML = respuesta;
-
+          setTimeout(predecir, 150);
       }
 
-      setTimeout(predecir, 150);
-    }
+      function procesarCamara() {
+          
+          var ctx = canvas.getContext("2d");
 
-    /**
+          ctx.drawImage(video, 0, 0, size, size, 0, 0, size, size);
+
+          setTimeout(procesarCamara, 20);
+      }
+
+      /**
        * Hermite resize - fast image resize/resample using Hermite filter. 1 cpu version!
        * 
        * @param {HtmlElement} canvas
@@ -262,6 +267,23 @@
 
           ctx2.putImageData(img2, 0, 0);
       }
-  </script>
+
+    </script>
+
+    <script src="https://www.gstatic.com/firebasejs/8.8.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.8.0/firebase-analytics.js"></script>
+    <script>
+      var firebaseConfig = {
+        apiKey: "AIzaSyAveaOMdSeaG82ukQpd-kvWKkD1-7AfmjY",
+        authDomain: "ringatech-website.firebaseapp.com",
+        projectId: "ringatech-website",
+        storageBucket: "ringatech-website.appspot.com",
+        messagingSenderId: "658482419973",
+        appId: "1:658482419973:web:647e7b53d39684ec7eff6c",
+        measurementId: "G-JMXEL2D511"
+      };
+      firebase.initializeApp(firebaseConfig);
+      firebase.analytics();
+    </script>
   </body>
 </html>
